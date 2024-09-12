@@ -78,7 +78,23 @@ class ProductsController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $request->validate([
+            'name' => 'required|min:3',
+            'description' => 'min:3',
+            'price' => 'required',
+            'category_id' => 'required',
+        ]);
+
+        $product = Products::find($id);
+        $product->name = $request->name;
+        $product->description = $request->description;
+        $product->price = $request->price;
+        $product->category_id = $request->category_id;
+        $product->save();
+
+        $product->taxes()->sync($request->tax_ids);
+
+        return response()->json(['message' => 'Product updated successfully']);
     }
 
     /**

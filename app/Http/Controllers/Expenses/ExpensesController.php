@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Expenses;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ExpensesController extends Controller
@@ -14,11 +13,20 @@ class ExpensesController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $company = Auth::user()->company_id;
+        $query = Expenses::where('company_id', '=', $company);
 
-        $expenses = Expenses::where('company_id', '=', $company)->paginate(10);
+        if ($request->has('query')){
+            $search = $request->input('query');
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'LIKE', "%{$search}%")
+                    ->orWhere('amount', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $expenses = $query->paginate(10);
 
         return response()->json($expenses);
     }
