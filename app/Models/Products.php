@@ -30,7 +30,7 @@ class Products extends Model
 
     protected $appends = [
         'category_name',
-        'tax_name'
+        'tax_name',
     ];
 
     public function getCategoryNameAttribute()

@@ -50,8 +50,8 @@ class ProductsController extends Controller
             'price' => 'required',
             'category_id' => 'required',
         ]);
-        
-        $product = new Products();
+
+        $product = new Products;
         $product->company_id = $company;
         $product->name = $request->name;
         $product->description = $request->description;

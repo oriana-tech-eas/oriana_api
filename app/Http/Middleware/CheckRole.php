@@ -15,14 +15,16 @@ class CheckRole
      */
     public function handle(Request $request, Closure $next, $role): Response
     {
-        if($request->user()->roles()->first()->name === 'admin'){
+        if ($request->user()->hasAnyRole(['admin', 'super-admin'])) {
             return $next($request);
         }
-        if(! $request->user() || $request->user()->roles()->first()->name !== $role){
+
+        if (! $request->user() || $request->user()->hasRole($role)) {
             return response()->json([
-                'error' => 'Unauthorized'
+                'error' => 'Unauthorized',
             ], 403);
         }
+
         return $next($request);
     }
 }

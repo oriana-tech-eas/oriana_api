@@ -8,10 +8,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class CompaniesController extends Controller
-{    
+{
     /**
-    * Display a listing of the resource.
-    */
+     * Display a listing of the resource.
+     */
     public function index()
     {
         $company = Auth::user()->company_id;
@@ -19,6 +19,7 @@ class CompaniesController extends Controller
 
         return response()->json($companies);
     }
+
     /**
      * Store a newly created resource in storage.
      */

@@ -10,7 +10,7 @@ use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
-    use HasFactory, Notifiable, HasApiTokens;
+    use HasApiTokens, HasFactory, Notifiable;
 
     /**
      * The attributes that are mass assignable.
@@ -35,24 +35,27 @@ class User extends Authenticatable
     ];
 
     protected $appends = [
-        'role',
         'initials',
-        'company_name'
     ];
 
     public function roles()
     {
-        return $this->belongsToMany(Roles::class);
+        return $this->hasManyThrough(Role::class, RoleUser::class, 'user_id', 'id', 'id', 'role_id');
     }
 
     public function company()
     {
-        return $this->belongsTo(Companies::class);
+        return $this->belongsTo(Company::class);
     }
 
     public function hasRole($role)
     {
-        return $this->roles()->where('name', $role)->exists();
+        return $this->roles()->count() ? $this->roles()->where('name', $role)->exists() : false;
+    }
+
+    public function hasAnyRole($roles)
+    {
+        return $this->roles()->count() ? $this->roles()->whereIn('name', $roles)->exists() : false;
     }
 
     public function permissions()
@@ -72,17 +75,8 @@ class User extends Authenticatable
         foreach ($name as $n) {
             $initials .= $n[0];
         }
+
         return $initials;
-    }
-
-    public function getCompanyNameAttribute()
-    {
-        return $this->company->name;
-    }
-
-    public function getRoleAttribute()
-    {
-        return $this->roles->first()->name;
     }
 
     /**

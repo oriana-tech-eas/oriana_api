@@ -13,9 +13,9 @@ return new class extends Migration
     {
         Schema::table('users', function (Blueprint $table) {
             $table->string('profile_picture')->nullable()->after('email');
-            $table->unsignedBigInteger('company_id')->nullable()->after('profile_picture');
-            $table->foreign('company_id')->references('id')->on('companies')->onDelete('cascade');
-        }); 
+            $table->unsignedBigInteger('current_company_id')->nullable()->after('profile_picture');
+            $table->foreign('current_company_id')->references('id')->on('companies')->onDelete('cascade');
+        });
     }
 
     /**
