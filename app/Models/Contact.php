@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class Contacts extends Model
+class Contact extends Model
 {
     use HasFactory;
 
@@ -29,7 +29,7 @@ class Contacts extends Model
     {
         $name = explode(' ', $this->name);
 
-        return strtoupper($name[0][0] . $name[1][0]);
+        return strtoupper($name[0][0].$name[1][0]);
     }
 
     public function users()

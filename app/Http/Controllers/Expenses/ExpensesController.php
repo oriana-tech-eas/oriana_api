@@ -18,7 +18,7 @@ class ExpensesController extends Controller
         $company = Auth::user()->company_id;
         $query = Expenses::where('company_id', '=', $company);
 
-        if ($request->has('query')){
+        if ($request->has('query')) {
             $search = $request->input('query');
             $query->where(function ($q) use ($search) {
                 $q->where('description', 'LIKE', "%{$search}%")
@@ -46,13 +46,13 @@ class ExpensesController extends Controller
             'tax_id' => 'required|integer',
             'contact_id' => 'required|integer',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
 
         try {
-            $expense = new Expenses();
+            $expense = new Expenses;
             $expense->company_id = $company;
             $expense->user_id = Auth::id();
             $expense->expense_date = $request->date;
@@ -64,7 +64,7 @@ class ExpensesController extends Controller
         } catch (\Exception $e) {
             return response()->json($e->getMessage(), 500);
         }
-        
+
         $expense->tax()->sync($request->tax_id);
 
         return response()->json($expense);

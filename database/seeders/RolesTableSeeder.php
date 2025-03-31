@@ -2,8 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\Roles;
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
+use App\Models\Role;
 use Illuminate\Database\Seeder;
 
 class RolesTableSeeder extends Seeder
@@ -14,6 +13,7 @@ class RolesTableSeeder extends Seeder
     public function run(): void
     {
         $roles = [
+            ['name' => 'super-admin'],
             ['name' => 'admin'],
             ['name' => 'owner'],
             ['name' => 'seller'],
@@ -21,6 +21,6 @@ class RolesTableSeeder extends Seeder
             ['name' => 'accountant'],
         ];
 
-        Roles::factory()->createMany($roles);
+        Role::factory()->createMany($roles);
     }
 }
