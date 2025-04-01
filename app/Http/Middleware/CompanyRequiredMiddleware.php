@@ -30,7 +30,9 @@ class CompanyRequiredMiddleware
 
         if (! $hasCompany) {
             return response()->json([
-                'error' => 'Debes tener al menos una empresa para acceder a esta funcionalidad',
+                'error' => 'company_required',
+                'message' => 'No tienes empresas asignadas',
+                'extended_message' => 'No tienes empresas asignadas, por favor contacta al administrador del sistema para que te asigne una empresa',
             ], 403);
         }
 
