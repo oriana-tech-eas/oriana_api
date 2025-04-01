@@ -48,7 +48,6 @@ class CompanyController extends Controller
             $company->name = $data['name'];
             $company->address = $data['address'] ?? null;
             $company->phone = $data['phone'] ?? null;
-            // $company->email = $data['email'] ?? null;
 
             // Si es super-admin y eligió un owner
             if ($user->hasRole('super-admin') && isset($data['owner_id'])) {
@@ -62,6 +61,12 @@ class CompanyController extends Controller
             }
 
             $company->save();
+
+            if (!$user->hasRole('super-admin')) {
+                // Si no es super-admin, asignar la empresa al creador
+                $user->current_company_id = $company->id;
+                $user->save();
+            }
 
             // Crear relación en la tabla pivot company_user
             $companyUser = new CompanyUser;
