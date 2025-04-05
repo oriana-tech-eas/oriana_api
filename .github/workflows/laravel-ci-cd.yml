@@ -1,0 +1,156 @@
+name: Laravel CI/CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+    tags: [ 'v*' ]
+  pull_request:
+    branches: 
+      - main
+      - development
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Oriana Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, fileinfo, mysql
+          coverage: none
+      
+      - name: Copy .env
+        run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+      
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+      
+      - name: Generate key
+        run: php artisan key:generate
+      
+      - name: Set Directory Permissions
+        run: chmod -R 777 storage bootstrap/cache
+      
+      - name: Create Database
+        run: |
+          mkdir -p database
+          touch database/database.sqlite
+      
+      - name: Execute tests via PHPUnit
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+        run: vendor/bin/phpunit
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to the Container registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+      
+      # Create the required directories for build context
+      - name: Create required directories
+        run: |
+          mkdir -p docker/nginx
+          mkdir -p docker/php-fpm.d
+      
+      # Copy the config files
+      - name: Copy Nginx config
+        run: |
+          cat > docker/nginx/default.conf << 'EOL'
+          server {
+              listen 80;
+              server_name _;
+              root /var/www/html/public;
+          
+              add_header X-Frame-Options "SAMEORIGIN";
+              add_header X-Content-Type-Options "nosniff";
+          
+              index index.php;
+          
+              charset utf-8;
+          
+              location / {
+                  try_files $uri $uri/ /index.php?$query_string;
+              }
+          
+              location = /favicon.ico { access_log off; log_not_found off; }
+              location = /robots.txt  { access_log off; log_not_found off; }
+          
+              error_page 404 /index.php;
+          
+              location ~ \.php$ {
+                  fastcgi_pass 127.0.0.1:9000;
+                  fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+                  include fastcgi_params;
+              }
+          
+              location ~ /\.(?!well-known).* {
+                  deny all;
+              }
+          }
+          EOL
+      
+      - name: Copy PHP-FPM config
+        run: |
+          cat > docker/php-fpm.d/www.conf << 'EOL'
+          [www]
+          user = www-data
+          group = www-data
+          listen = 127.0.0.1:9000
+          pm = dynamic
+          pm.max_children = 10
+          pm.start_servers = 2
+          pm.min_spare_servers = 1
+          pm.max_spare_servers = 3
+          EOL
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
