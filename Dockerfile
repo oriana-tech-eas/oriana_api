@@ -18,8 +18,8 @@ WORKDIR /var/www/html
 # Install composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# PHP configuration
-COPY php.ini-production /usr/local/etc/php/php.ini
+# Create a custom php.ini
+RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 # PHP-FPM configuration
 COPY docker/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf
