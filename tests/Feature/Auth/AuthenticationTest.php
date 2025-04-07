@@ -10,38 +10,42 @@ class AuthenticationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_users_can_authenticate_using_the_login_screen(): void
+    public function test_users_can_authenticate_using_the_api()
     {
-        $user = User::factory()->create();
+        $user = User::factory()->create([
+            'email' => 'test@example.com',
+            'password' => bcrypt('password'),
+        ]);
 
-        $response = $this->post('/login', [
-            'email' => $user->email,
+        $response = $this->postJson('/api/login', [
+            'email' => 'test@example.com',
             'password' => 'password',
         ]);
 
-        $this->assertAuthenticated();
-        $response->assertNoContent();
+        $response->assertStatus(200);
+        $response->assertJsonStructure(['token']);
+        
+        // For token-based auth, we wouldn't assert user authentication directly
+        // Instead, we would verify the token can be used for authorized endpoints
+        $token = $response->json('token');
+        
+        $authResponse = $this->withHeaders([
+            'Authorization' => 'Bearer ' . $token,
+        ])->getJson('/api/user');
+        
+        $authResponse->assertStatus(200);
+        $authResponse->assertJson(['email' => 'test@example.com']);
     }
 
-    public function test_users_can_not_authenticate_with_invalid_password(): void
+    public function test_users_can_not_authenticate_with_invalid_password()
     {
         $user = User::factory()->create();
 
-        $this->post('/login', [
+        $response = $this->postJson('/api/login', [
             'email' => $user->email,
             'password' => 'wrong-password',
         ]);
 
-        $this->assertGuest();
-    }
-
-    public function test_users_can_logout(): void
-    {
-        $user = User::factory()->create();
-
-        $response = $this->actingAs($user)->post('/logout');
-
-        $this->assertGuest();
-        $response->assertNoContent();
+        $response->assertStatus(401);
     }
 }
