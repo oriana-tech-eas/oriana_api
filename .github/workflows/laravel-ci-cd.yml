@@ -117,7 +117,7 @@ jobs:
           # Create Nginx config
           cat > docker/nginx/default.conf << 'EOL'
           server {
-              listen 80;
+              listen 8080;
               server_name _;
               root /var/www/html/public;
           
@@ -286,7 +286,7 @@ jobs:
           RUN apk add --no-cache nginx
           COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
           
-          EXPOSE 80
+          EXPOSE 8080
           
           # Start Supervisor (manages Nginx and PHP-FPM)
           CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
