@@ -88,15 +88,33 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=sha,format=short
       
-      # Create the required directories for build context
-      - name: Create required directories
+      # Create production environment file
+      - name: Create .env.production file
         run: |
-          mkdir -p docker/nginx
-          mkdir -p docker/php-fpm.d
+          cat > .env.production << 'EOL'
+          APP_NAME=Oriana
+          APP_ENV=production
+          APP_KEY=${{ secrets.APP_KEY }}
+          APP_DEBUG=false
+          APP_URL=${{ vars.APP_URL || 'https://your-production-url.com' }}
+          
+          LOG_CHANNEL=stack
+          LOG_LEVEL=error
+          
+          DB_CONNECTION=mysql
+          DB_HOST=${{ vars.DB_HOST || 'database' }}
+          DB_PORT=${{ vars.DB_PORT || '3306' }}
+          DB_DATABASE=${{ vars.DB_DATABASE || 'oriana_production' }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          EOL
       
-      # Create the config files
-      - name: Create Nginx config
+      # Create required directories and config files
+      - name: Create required directories and config files
         run: |
+          mkdir -p docker/nginx docker/php-fpm.d docker/php
+          
+          # Create Nginx config
           cat > docker/nginx/default.conf << 'EOL'
           server {
               listen 80;
@@ -130,9 +148,8 @@ jobs:
               }
           }
           EOL
-      
-      - name: Create PHP-FPM config
-        run: |
+          
+          # Create PHP-FPM config
           cat > docker/php-fpm.d/www.conf << 'EOL'
           [www]
           user = www-data
@@ -144,77 +161,118 @@ jobs:
           pm.min_spare_servers = 1
           pm.max_spare_servers = 3
           EOL
+          
+          # Create PHP ini file
+          cat > docker/php/php.ini << 'EOL'
+          memory_limit = 512M
+          max_execution_time = 60
+          upload_max_filesize = 50M
+          post_max_size = 50M
+          error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+          display_errors = Off
+          log_errors = On
+          EOL
+          
+          # Create supervisor config
+          mkdir -p docker/supervisor
+          cat > docker/supervisord.conf << 'EOL'
+          [supervisord]
+          nodaemon=true
+          logfile=/var/log/supervisord.log
+          logfile_maxbytes=10MB
+          logfile_backups=10
+          loglevel=info
+          pidfile=/var/run/supervisord.pid
+          
+          [program:nginx]
+          command=nginx -g "daemon off;"
+          autostart=true
+          autorestart=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          
+          [program:php-fpm]
+          command=php-fpm -F
+          autostart=true
+          autorestart=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          EOL
       
       # Create Dockerfile
       - name: Create Dockerfile
         run: |
           cat > Dockerfile << 'EOL'
-          FROM php:8.3-fpm-alpine AS php
-
-          # Install dependencies
+          FROM php:8.3-fpm-alpine
+          
+          WORKDIR /var/www/html
+          
+          # Install system dependencies
           RUN apk add --no-cache \
+              curl \
               libpng-dev \
+              libxml2-dev \
+              mysql-client \
+              oniguruma-dev \
               libzip-dev \
               zip \
               unzip \
-              git \
-              curl
-
+              git
+          
           # Install PHP extensions
-          RUN docker-php-ext-install pdo_mysql zip exif pcntl gd
-
-          # Set working directory
-          WORKDIR /var/www/html
-
-          # Install composer
+          RUN docker-php-ext-install \
+              bcmath \
+              ctype \
+              dom \
+              fileinfo \
+              gd \
+              mbstring \
+              pdo \
+              pdo_mysql \
+              xml \
+              zip
+          
+          # Get latest Composer
           COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
-
-          # Create a custom php.ini
-          RUN cp "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-
-          # PHP-FPM configuration
-          COPY docker/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf
-
-          # Copy application code
+          
+          # Copy application
           COPY . .
-
-          # Set permissions
-          RUN chown -R www-data:www-data /var/www/html \
-              && chmod -R 755 /var/www/html/storage
-
-          # Install dependencies
+          
+          # Copy environment file
+          COPY .env.production .env
+          
+          # Install production dependencies
           RUN composer install --optimize-autoloader --no-dev --no-interaction
-
+          
+          # Set permissions
+          RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+          RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+          
           # Optimize Laravel
-          RUN php artisan optimize:clear \
-              && php artisan optimize \
-              && php artisan config:cache \
-              && php artisan route:cache \
-              && php artisan view:cache
-
-          # Nginx stage
-          FROM nginx:stable-alpine AS nginx
-
-          # Set working directory
-          WORKDIR /var/www/html
-
-          # Copy Nginx configuration
-          COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
-
-          # Copy application from PHP stage
-          COPY --from=php /var/www/html/public /var/www/html/public
-
-          # Expose port 80
+          RUN php artisan config:cache && \
+              php artisan route:cache && \
+              php artisan view:cache
+          
+          # Install Supervisor
+          RUN apk add --no-cache supervisor
+          COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+          
+          # Configure PHP-FPM
+          COPY docker/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf
+          COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+          
+          # Add Nginx
+          RUN apk add --no-cache nginx
+          COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+          
           EXPOSE 80
-
-          # Start Nginx
-          CMD ["nginx", "-g", "daemon off;"]
-
-          # PHP-FPM stage (final)
-          FROM php AS final
-
-          # Start PHP-FPM
-          CMD ["php-fpm"]
+          
+          # Start Supervisor (manages Nginx and PHP-FPM)
+          CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
           EOL
       
       - name: Build and push Docker image
