@@ -13,10 +13,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
-});
-
-
-Route::middleware(['auth:sanctum'])->group(function () {
+    
     // Ruta para crear empresa (no requiere la verificación de empresa.required)
     Route::post('/companies', [CompanyController::class, 'store']);
     Route::get('/companies', [CompanyController::class, 'index']);
