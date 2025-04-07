@@ -1,0 +1,303 @@
+name: Laravel CI/CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main
+    tags: [ 'v*' ]
+  pull_request:
+    branches: 
+      - main
+      - development
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Test Oriana Application
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, dom, fileinfo, mysql
+          coverage: none
+      
+      - name: Copy .env
+        run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+      
+      - name: Install Composer Dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+      
+      - name: Generate key
+        run: php artisan key:generate
+      
+      - name: Set Directory Permissions
+        run: chmod -R 777 storage bootstrap/cache
+      
+      - name: Create Database
+        run: |
+          mkdir -p database
+          touch database/database.sqlite
+      
+      - name: Execute tests via PHPUnit
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
+        run: vendor/bin/phpunit
+
+  build-and-push:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to the Container registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=short
+      
+      # Create production environment file
+      - name: Create .env.production file
+        run: |
+          cat > .env.production << 'EOL'
+          APP_NAME=Oriana
+          APP_ENV=production
+          APP_KEY=${{ secrets.APP_KEY }}
+          APP_DEBUG=false
+          APP_URL=${{ vars.APP_URL || 'https://your-production-url.com' }}
+          
+          LOG_CHANNEL=stack
+          LOG_LEVEL=error
+          
+          DB_CONNECTION=mysql
+          DB_HOST=${{ vars.DB_HOST || 'database' }}
+          DB_PORT=${{ vars.DB_PORT || '3306' }}
+          DB_DATABASE=${{ vars.DB_DATABASE || 'oriana_production' }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          EOL
+      
+      # Create required directories and config files
+      - name: Create required directories and config files
+        run: |
+          mkdir -p docker/nginx docker/php-fpm.d docker/php
+          
+          # Create Nginx config
+          cat > docker/nginx/default.conf << 'EOL'
+          server {
+              listen 80;
+              server_name _;
+              root /var/www/html/public;
+          
+              add_header X-Frame-Options "SAMEORIGIN";
+              add_header X-Content-Type-Options "nosniff";
+          
+              index index.php;
+          
+              charset utf-8;
+          
+              location / {
+                  try_files $uri $uri/ /index.php?$query_string;
+              }
+          
+              location = /favicon.ico { access_log off; log_not_found off; }
+              location = /robots.txt  { access_log off; log_not_found off; }
+          
+              error_page 404 /index.php;
+          
+              location ~ \.php$ {
+                  fastcgi_pass 127.0.0.1:9000;
+                  fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+                  include fastcgi_params;
+              }
+          
+              location ~ /\.(?!well-known).* {
+                  deny all;
+              }
+          }
+          EOL
+          
+          # Create PHP-FPM config
+          cat > docker/php-fpm.d/www.conf << 'EOL'
+          [www]
+          user = www-data
+          group = www-data
+          listen = 127.0.0.1:9000
+          pm = dynamic
+          pm.max_children = 10
+          pm.start_servers = 2
+          pm.min_spare_servers = 1
+          pm.max_spare_servers = 3
+          EOL
+          
+          # Create PHP ini file
+          cat > docker/php/php.ini << 'EOL'
+          memory_limit = 512M
+          max_execution_time = 60
+          upload_max_filesize = 50M
+          post_max_size = 50M
+          error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
+          display_errors = Off
+          log_errors = On
+          EOL
+          
+          # Create supervisor config
+          mkdir -p docker/supervisor
+          cat > docker/supervisord.conf << 'EOL'
+          [supervisord]
+          nodaemon=true
+          logfile=/var/log/supervisord.log
+          logfile_maxbytes=10MB
+          logfile_backups=10
+          loglevel=info
+          pidfile=/var/run/supervisord.pid
+          
+          [program:laravel-optimize]
+          command=/usr/local/bin/optimize.sh
+          autostart=true
+          autorestart=false
+          startsecs=0
+          startretries=1
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          priority=10
+          
+          [program:nginx]
+          command=nginx -g "daemon off;"
+          autostart=true
+          autorestart=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          priority=20
+          
+          [program:php-fpm]
+          command=php-fpm -F
+          autostart=true
+          autorestart=true
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          priority=15
+          EOL
+      
+      # Create Dockerfile
+      - name: Create Dockerfile
+        run: |
+          cat > Dockerfile << 'EOL'
+          FROM php:8.3-fpm-alpine
+          
+          WORKDIR /var/www/html
+          
+          # Install system dependencies
+          RUN apk add --no-cache \
+              curl \
+              libpng-dev \
+              libxml2-dev \
+              mysql-client \
+              oniguruma-dev \
+              libzip-dev \
+              zip \
+              unzip \
+              git
+          
+          # Install PHP extensions
+          RUN docker-php-ext-install \
+              bcmath \
+              ctype \
+              dom \
+              fileinfo \
+              gd \
+              mbstring \
+              pdo \
+              pdo_mysql \
+              xml \
+              zip
+          
+          # Get latest Composer
+          COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+          
+          # Copy application
+          COPY . .
+          
+          # Copy environment file
+          COPY .env.production .env
+          
+          # Install production dependencies
+          RUN composer install --optimize-autoloader --no-dev --no-interaction
+          
+          # Set permissions
+          RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
+          RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
+          
+          # Create a script to run Laravel optimization commands at container startup instead of build time
+          RUN echo '#!/bin/sh' > /usr/local/bin/optimize.sh \
+              && echo 'cd /var/www/html' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan config:cache' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan route:cache' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan view:cache' >> /usr/local/bin/optimize.sh \
+              && chmod +x /usr/local/bin/optimize.sh
+          
+          # Install Supervisor
+          RUN apk add --no-cache supervisor
+          COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+          
+          # Configure PHP-FPM
+          COPY docker/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/www.conf
+          COPY docker/php/php.ini /usr/local/etc/php/conf.d/custom.ini
+          
+          # Add Nginx
+          RUN apk add --no-cache nginx
+          COPY docker/nginx/default.conf /etc/nginx/http.d/default.conf
+          
+          EXPOSE 80
+          
+          # Start Supervisor (manages Nginx and PHP-FPM)
+          CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+          EOL
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

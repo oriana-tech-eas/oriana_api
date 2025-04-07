@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\Expenses;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Validator;
 
 class ExpensesController extends Controller
@@ -14,11 +13,20 @@ class ExpensesController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
         $company = Auth::user()->company_id;
+        $query = Expenses::where('company_id', '=', $company);
 
-        $expenses = Expenses::where('company_id', '=', $company)->paginate(10);
+        if ($request->has('query')) {
+            $search = $request->input('query');
+            $query->where(function ($q) use ($search) {
+                $q->where('description', 'LIKE', "%{$search}%")
+                    ->orWhere('amount', 'LIKE', "%{$search}%");
+            });
+        }
+
+        $expenses = $query->paginate(10);
 
         return response()->json($expenses);
     }
@@ -38,13 +46,13 @@ class ExpensesController extends Controller
             'tax_id' => 'required|integer',
             'contact_id' => 'required|integer',
         ]);
-        
+
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 400);
         }
 
         try {
-            $expense = new Expenses();
+            $expense = new Expenses;
             $expense->company_id = $company;
             $expense->user_id = Auth::id();
             $expense->expense_date = $request->date;
@@ -56,7 +64,7 @@ class ExpensesController extends Controller
         } catch (\Exception $e) {
             return response()->json($e->getMessage(), 500);
         }
-        
+
         $expense->tax()->sync($request->tax_id);
 
         return response()->json($expense);

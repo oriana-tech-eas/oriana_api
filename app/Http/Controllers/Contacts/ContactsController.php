@@ -3,71 +3,39 @@
 namespace App\Http\Controllers\Contacts;
 
 use App\Http\Controllers\Controller;
-use App\Models\Contacts;
+use App\Http\Requests\Contacts\StoreContactRequest;
+use App\Services\Contacts\ContactService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 class ContactsController extends Controller
 {
+    protected ContactService $contactService;
+
+    public function __construct(ContactService $contactService)
+    {
+        $this->contactService = $contactService;
+    }
+
     /**
      * Display a listing of the resource.
      */
-    public function index(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        $company = Auth::user()->company_id;
-        $query = Contacts::where('company_id', '=', $company);
+        $result = $this->contactService->getContacts($request->all());
 
-        if ($request->has('contacts_type')) {
-            $query->where('contacts_type', $request->input('contacts_type'));
-        }
-
-        if ($request->has('query')) {
-            $search = $request->input('query');
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'LIKE', "%{$search}%")
-                    ->orWhere('phone', 'LIKE', "%{$search}%")
-                    ->orWhere('email', 'LIKE', "%{$search}%")
-                    ->orWhere('document', 'LIKE', "%{$search}%");
-            });
-        }
-
-        $contacts = $query->paginate(10);
-        $lastUpdate = Contacts::where('company_id', '=', $company)->max('updated_at');
-        $recentlyAdded = Contacts::where('company_id', '=', $company)->where('created_at', '>=', now()->subDays(3))->count();
-
-        return response()->json([
-            'data' => $contacts->toArray(),
-            'recently_added' => $recentlyAdded,
-            'last_update' => $lastUpdate,
-        ]);
+        return response()->json($result);
     }
 
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(StoreContactRequest $request): JsonResponse
     {
-        $request->validate([
-            'name' => 'required|string',
-            'phone' => 'string|min:10|max:15',
-            'email' => 'required|email',
-            'address' => 'required|string',
-            'document' => 'required|string|min:7|max:10',
-        ]);
-
         try {
-            $contact = new Contacts();
-            $contact->name = $request->name;
-            $contact->phone = $request->phone;
-            $contact->email = $request->email;
-            $contact->address = $request->address;
-            $contact->document = $request->document;
-            $contact->contacts_type = $request->contacts_type;
-            $contact->company_id = Auth::user()->company_id;
-            $contact->user_id = Auth::user()->id;
-            $contact->save();
+            $contact = $this->contactService->createContact($request->validated());
 
-            return response()->json(['message' => 'Customer created', $contact], 200);
+            return response()->json(['message' => 'Customer created', 'data' => $contact], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);
         }
@@ -76,9 +44,9 @@ class ContactsController extends Controller
     /**
      * Display the specified resource.
      */
-    public function show(string $id)
+    public function show(string $id): JsonResponse
     {
-        $contact = Contacts::find($id);
+        $contact = $this->contactService->getContactById($id);
 
         return response()->json($contact);
     }
@@ -86,19 +54,25 @@ class ContactsController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, string $id)
+    public function update(StoreContactRequest $request, string $id): JsonResponse
     {
-        //
+        try {
+            $contact = $this->contactService->updateContact($id, $request->validated());
+
+            return response()->json(['message' => 'Contact updated', 'data' => $contact], 200);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
     }
 
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(string $id)
+    public function destroy(string $id): JsonResponse
     {
-        $contact = Contacts::find($id);
         try {
-            $contact->delete();
+            $this->contactService->deleteContact($id);
+
             return response()->json(['message' => 'Contact deleted'], 200);
         } catch (\Exception $e) {
             return response()->json(['error' => $e->getMessage()], 500);

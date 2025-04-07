@@ -23,7 +23,7 @@ class CategoriesController extends Controller
         }
 
         $categories = $categoriesQuery->where(
-            function ($query) use ($request) {
+            function ($query) {
                 $query->where('company_id', Auth::user()->company_id)
                     ->orWhere('is_shared', true);
             }
@@ -42,7 +42,7 @@ class CategoriesController extends Controller
             'category_type' => 'required',
         ]);
 
-        $category = new Categories();
+        $category = new Categories;
         $category->name = $request->name;
         $category->category_type = $request->category_type;
         $category->company_id = Auth::user()->company_id;
@@ -75,7 +75,7 @@ class CategoriesController extends Controller
     {
         $category = Categories::where('id', $id)->first();
 
-        if (!$category) {
+        if (! $category) {
             return response()->json(['message' => 'Categoría no encontrada'], 404);
         }
 

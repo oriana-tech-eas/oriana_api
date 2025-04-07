@@ -21,9 +21,8 @@ class ProductsController extends Controller
             $search = $request->input('query');
             $query->where(function ($q) use ($search) {
                 $q->where('name', 'LIKE', "%{$search}%")
-                    ->orWhere('phone', 'LIKE', "%{$search}%")
-                    ->orWhere('email', 'LIKE', "%{$search}%")
-                    ->orWhere('document', 'LIKE', "%{$search}%");
+                    ->orWhere('description', 'LIKE', "%{$search}%")
+                    ->orWhere('barcode', 'LIKE', "%{$search}%");
             });
         }
 
@@ -51,8 +50,8 @@ class ProductsController extends Controller
             'price' => 'required',
             'category_id' => 'required',
         ]);
-        
-        $product = new Products();
+
+        $product = new Products;
         $product->company_id = $company;
         $product->name = $request->name;
         $product->description = $request->description;
@@ -78,7 +77,23 @@ class ProductsController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
+        $request->validate([
+            'name' => 'required|min:3',
+            'description' => 'min:3',
+            'price' => 'required',
+            'category_id' => 'required',
+        ]);
+
+        $product = Products::find($id);
+        $product->name = $request->name;
+        $product->description = $request->description;
+        $product->price = $request->price;
+        $product->category_id = $request->category_id;
+        $product->save();
+
+        $product->taxes()->sync($request->tax_ids);
+
+        return response()->json(['message' => 'Product updated successfully']);
     }
 
     /**

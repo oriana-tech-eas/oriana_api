@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('phone');
             $table->string('address');
             $table->string('document');
-            $table->string('contacts_type'); //supplier or customer
+            $table->string('contacts_type'); // supplier or customer
             $table->timestamps();
 
             $table->unsignedBigInteger('user_id');
