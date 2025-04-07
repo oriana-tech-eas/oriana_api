@@ -184,6 +184,18 @@ jobs:
           loglevel=info
           pidfile=/var/run/supervisord.pid
           
+          [program:laravel-optimize]
+          command=/usr/local/bin/optimize.sh
+          autostart=true
+          autorestart=false
+          startsecs=0
+          startretries=1
+          stdout_logfile=/dev/stdout
+          stdout_logfile_maxbytes=0
+          stderr_logfile=/dev/stderr
+          stderr_logfile_maxbytes=0
+          priority=10
+          
           [program:nginx]
           command=nginx -g "daemon off;"
           autostart=true
@@ -192,6 +204,7 @@ jobs:
           stdout_logfile_maxbytes=0
           stderr_logfile=/dev/stderr
           stderr_logfile_maxbytes=0
+          priority=20
           
           [program:php-fpm]
           command=php-fpm -F
@@ -201,6 +214,7 @@ jobs:
           stdout_logfile_maxbytes=0
           stderr_logfile=/dev/stderr
           stderr_logfile_maxbytes=0
+          priority=15
           EOL
       
       # Create Dockerfile
@@ -252,10 +266,13 @@ jobs:
           RUN chown -R www-data:www-data /var/www/html/storage /var/www/html/bootstrap/cache
           RUN chmod -R 775 /var/www/html/storage /var/www/html/bootstrap/cache
           
-          # Optimize Laravel
-          RUN php artisan config:cache && \
-              php artisan route:cache && \
-              php artisan view:cache
+          # Create a script to run Laravel optimization commands at container startup instead of build time
+          RUN echo '#!/bin/sh' > /usr/local/bin/optimize.sh \
+              && echo 'cd /var/www/html' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan config:cache' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan route:cache' >> /usr/local/bin/optimize.sh \
+              && echo 'php artisan view:cache' >> /usr/local/bin/optimize.sh \
+              && chmod +x /usr/local/bin/optimize.sh
           
           # Install Supervisor
           RUN apk add --no-cache supervisor
