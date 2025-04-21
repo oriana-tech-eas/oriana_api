@@ -21,6 +21,8 @@ class RolesTableSeeder extends Seeder
             ['name' => 'accountant'],
         ];
 
-        Role::factory()->createMany($roles);
+        foreach ($roles as $role) {
+            Role::create($role);
+        }
     }
 }

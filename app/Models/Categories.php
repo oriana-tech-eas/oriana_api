@@ -23,7 +23,7 @@ class Categories extends Model
 
     public function company()
     {
-        return $this->belongsTo(Companies::class);
+        return $this->belongsTo(Company::class);
     }
 
     public function user()

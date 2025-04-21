@@ -29,7 +29,11 @@ class Contact extends Model
     {
         $name = explode(' ', $this->name);
 
-        return strtoupper($name[0][0].$name[1][0]);
+        if (count($name) === 1) {
+            return strtoupper($name[0][0]);
+        }
+
+        return strtoupper($name[0][0] . $name[1][0]);
     }
 
     public function users()
@@ -39,6 +43,6 @@ class Contact extends Model
 
     public function companies()
     {
-        return $this->belongsTo(Companies::class, 'id', 'company_id');
+        return $this->belongsTo(Company::class, 'id', 'company_id');
     }
 }
