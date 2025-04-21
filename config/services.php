@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'oriana-auth-server' => [
+        'base_url' => env('ORIANA_AUTH_SERVER_BASE_URL'),
+        'client_id' => env('ORIANA_AUTH_SERVER_CLIENT_ID'),
+        'client_secret' => env('ORIANA_AUTH_SERVER_CLIENT_SECRET'),
+        'grant_type' => env('ORIANA_AUTH_SERVER_GRANT_TYPE'),
+    ],
 ];
