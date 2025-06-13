@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 use App\Models\Customer;
+use Illuminate\Support\Facades\Log;
 
 class Device extends Model
 {
@@ -30,6 +31,10 @@ class Device extends Model
     protected $casts = [
         'metadata' => 'array',
         'last_seen' => 'datetime',
+    ];
+
+    protected $hidden = [
+        'api_key',
     ];
 
     // Auto-generate UUID when creating
@@ -68,6 +73,45 @@ class Device extends Model
         return $this->api_key;
     }
 
+    public function scopeForCustomer($query, $customerId)
+    {
+        return $query->where('customer_id', $customerId);
+    }
+
+    public function scopeOnline($query)
+    {
+        return $query->where('status', 'active')
+            ->where('last_seen', '>', now()->subMinutes(5));
+    }
+
+    public function scopeByType($query, $type)
+    {
+        return $query->where('type', $type);
+    }
+
+    public function getStatusText(): string
+    {
+        if (!$this->isOnline()) {
+            return 'Offline';
+        }
+        
+        return match($this->status) {
+            'active' => 'Online',
+            'suspended' => 'Suspended',
+            'inactive' => 'Inactive',
+            default => 'Unknown'
+        };
+    }
+    
+    public function getLastSeenHuman(): string
+    {
+        if (!$this->last_seen) {
+            return 'Never';
+        }
+        
+        return $this->last_seen->diffForHumans();
+    }
+
     public function isOnline(): bool
     {
         if (!$this->last_seen) {
@@ -78,9 +122,120 @@ class Device extends Model
         return $this->last_seen->diffInMinutes(now()) < 5;
     }
 
+    public function getLatestMetricByType(string $metricType): ?DeviceMetric
+    {
+        return $this->metrics()
+            ->where('metric_type', $metricType)
+            ->orderBy('collected_at', 'desc')
+            ->first();
+    }
+
+    public function getSystemHealth(): array
+    {
+        $systemMetric = $this->getLatestMetricByType('system_data');
+        
+        if (!$systemMetric || !isset($systemMetric->data['cpu'])) {
+            return [
+                'overall' => 0,
+                'cpu' => 0,
+                'memory' => 0,
+                'disk' => 0,
+                'status' => 'no_data'
+            ];
+        }
+        
+        $data = $systemMetric->data;
+        $cpuHealth = max(0, 100 - ($data['cpu']['usage'] ?? 0));
+        $memoryHealth = max(0, 100 - ($data['memory']['usage_percent'] ?? 0));
+        $diskHealth = max(0, 100 - ($data['disk']['usage_percent'] ?? 0));
+        
+        $overall = ($cpuHealth + $memoryHealth + $diskHealth) / 3;
+        
+        return [
+            'overall' => round($overall),
+            'cpu' => round($cpuHealth),
+            'memory' => round($memoryHealth),
+            'disk' => round($diskHealth),
+            'status' => $overall > 80 ? 'good' : ($overall > 60 ? 'warning' : 'critical')
+        ];
+    }
+
+    public function getNetworkSummary(): array
+    {
+        $networkMetric = $this->getLatestMetricByType('network_data');
+        
+        if (!$networkMetric || !isset($networkMetric->data['summary'])) {
+            return [
+                'active_devices' => 0,
+                'bandwidth_utilization' => 0,
+                'blocked_requests' => 0,
+                'status' => 'no_data'
+            ];
+        }
+        
+        $summary = $networkMetric->data['summary'];
+        
+        return [
+            'active_devices' => $summary['active_devices'] ?? 0,
+            'bandwidth_utilization' => $summary['bandwidth_utilization'] ?? 0,
+            'blocked_requests' => $summary['blocked_requests'] ?? 0,
+            'total_devices' => $summary['total_devices'] ?? count($networkMetric->data['devices'] ?? []),
+            'status' => 'active'
+        ];
+    }
+
     // Scopes
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    public static function findForCustomer($deviceId, $customerId): ?self
+    {
+        return static::where('id', $deviceId)
+            ->where('customer_id', $customerId)
+            ->first();
+    }
+
+    public function belongsToCustomer($customerId): bool
+    {
+        return $this->customer_id === $customerId;
+    }
+
+    public function recordActivity(string $activity, array $details = []): void
+    {
+        Log::info("Device activity: {$activity}", [
+            'device_id' => $this->id,
+            'device_name' => $this->name,
+            'customer_id' => $this->customer_id,
+            'details' => $details
+        ]);
+        
+        // You could also create a DeviceActivity model to store these
+    }
+
+    public function updateLastSeen(): void
+    {
+        $this->update(['last_seen' => now()]);
+    }
+
+    public function toApiArray(): array
+    {
+        return [
+            'id' => $this->id,
+            'device_id' => $this->device_id,
+            'name' => $this->name,
+            'type' => $this->device_type,
+            'status' => $this->status,
+            'status_text' => $this->getStatusText(),
+            'last_seen' => $this->last_seen,
+            'last_seen_human' => $this->getLastSeenHuman(),
+            'metadata' => $this->metadata,
+            'is_online' => $this->isOnline(),
+            'health' => $this->getSystemHealth(),
+            'network_summary' => $this->device_type === 'network' ? $this->getNetworkSummary() : null,
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
+        ];
     }
 }

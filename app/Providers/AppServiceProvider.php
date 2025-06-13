@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Interfaces\ContactRepositoryInterface;
 use App\Repositories\Contacts\ContactRepository;
+use App\Services\KeycloakJwtService;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Cache\RateLimiter;
@@ -19,6 +20,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(ContactRepositoryInterface::class, ContactRepository::class);
+        $this->app->singleton(KeycloakJwtService::class);
     }
 
     protected function configureRateLimiting()

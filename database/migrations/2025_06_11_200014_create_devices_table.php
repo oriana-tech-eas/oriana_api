@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('devices', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignId('customer_id')->constrained()->cascadeOnDelete();
+            $table->uuid('customer_id');
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
             $table->string('device_id')->unique(); // Hardware identifier (like pi-001)
             $table->enum('device_type', ['network', 'server', 'hybrid']);
             $table->string('name'); // User-friendly name like "Oficina Principal"

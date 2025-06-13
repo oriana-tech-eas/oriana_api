@@ -28,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'permissions' => CheckPermission::class,
             'company.required' => CompanyRequiredMiddleware::class,
             'device.auth' => \App\Http\Middleware\DeviceAuthMiddleware::class,
+            'customer.auth' => \App\Http\Middleware\ResolveCustomerFromToken::class,
+            'customer.owns' => \App\Http\Middleware\EnsureCustomerOwnsResource::class,
         ]);
 
         //

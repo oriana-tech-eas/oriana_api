@@ -5,7 +5,6 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Customer;
 use App\Models\IoT\Device;
-use App\Models\User;
 use Illuminate\Support\Str;
 
 class IoTSeeder extends Seeder
@@ -14,7 +13,7 @@ class IoTSeeder extends Seeder
     {
 
         // Create test customers
-        $customer1 = Customer::firstOrCreate(
+        $customer1 = Customer::updateOrCreate(
             ['email' => 'empresa@test.com'],
             [
                 'name' => 'Empresa Test SA',
@@ -25,7 +24,7 @@ class IoTSeeder extends Seeder
             ]
         );
 
-        $customer2 = Customer::firstOrCreate(
+        $customer2 = Customer::updateOrCreate(
             ['email' => 'startup@test.com'],
             [
                 'name' => 'Startup Innovadora',
@@ -67,24 +66,6 @@ class IoTSeeder extends Seeder
                     'hardware' => 'Ubuntu Server 22.04',
                     'location' => 'Sala de Servidores',
                     'ip_address' => '192.168.1.10',
-                ],
-            ]
-        );
-
-        // Create test devices for customer 2
-        $hybridDevice = Device::firstOrCreate(
-            ['device_id' => 'hybrid-mini-001'],
-            [
-                'customer_id' => $customer2->id,
-                'device_type' => 'hybrid',
-                'name' => 'Todo en Uno',
-                'status' => 'active',
-                'api_key' => 'device_' . Str::random(40),
-                'last_seen' => now()->subMinutes(1),
-                'metadata' => [
-                    'hardware' => 'Intel NUC',
-                    'location' => 'Oficina Startup',
-                    'ip_address' => '10.0.0.50',
                 ],
             ]
         );

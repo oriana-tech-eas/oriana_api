@@ -10,7 +10,8 @@ return new class extends Migration
     {
         Schema::create('device_registrations', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->foreignId('customer_id')->constrained();
+            $table->uuid('customer_id');
+            $table->foreign('customer_id')->references('id')->on('customers')->cascadeOnDelete();
             $table->string('device_id'); // The device requesting registration
             $table->enum('device_type', ['network', 'server', 'hybrid']);
             $table->string('name'); // User-friendly name

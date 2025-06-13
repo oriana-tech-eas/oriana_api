@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\IoT\DeviceController;
 use App\Http\Controllers\IoT\MetricsController;
 use App\Http\Controllers\IoT\WebSocketController;
+use App\Http\Controllers\IoT\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -114,18 +115,21 @@ Route::prefix('iot')->group(function () {
         ->middleware('device.auth');
 
     // Dashboard API routes (for React frontend - will use JWT/Sanctum later)
-    Route::prefix('dashboard')->group(function () {
-        
-        // Public endpoints for now (will add auth later)
-        Route::get('/devices', [DeviceController::class, 'getCustomerDevices']);
-        Route::get('/devices/{device}/metrics', [MetricsController::class, 'getDeviceMetrics']);
-        Route::get('/devices/{device}/security-events', [MetricsController::class, 'getSecurityEvents']);
-        
-        // Device management endpoints
-        Route::post('/devices/{device}/restart', [DeviceController::class, 'restartDevice']);
-        Route::patch('/devices/{device}/settings', [DeviceController::class, 'updateSettings']);
-        
-        // WebSocket for dashboard real-time updates
-        Route::get('/ws', [WebSocketController::class, 'handleDashboardConnection']);
+    Route::prefix('dashboard')
+    ->middleware(['customer.auth']) // Apply customer resolution to all routes
+    ->group(function () {
+        // Get all customer devices
+        Route::get('/devices', [DashboardController::class, 'devices']);
+        // Get customer summary
+        Route::get('/summary', [DashboardController::class, 'summary']);
+        // Device-specific routes with ownership verification
+        Route::middleware(['customer.owns:device'])->group(function () {
+            // Get specific device
+            Route::get('/devices/{device}', [DashboardController::class, 'device']);
+            // Get device metrics
+            Route::get('/devices/{device}/metrics', [DashboardController::class, 'deviceMetrics']);
+            // Execute device actions
+            Route::post('/devices/{device}/actions', [DashboardController::class, 'deviceAction']);
+        });
     });
 });
