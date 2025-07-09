@@ -2,6 +2,7 @@
 
 namespace App\Models\IoT;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 
 class SecurityEvent extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     // Use UUID as primary key
     protected $keyType = 'string';
@@ -17,34 +18,22 @@ class SecurityEvent extends Model
 
     protected $fillable = [
         'device_id',
-        'event_id',        // ADDED: This was missing!
+        'event_id',
         'event_type',
         'severity',
         'source_ip',
         'domain',
-        'category',        // ADDED: This was missing!
+        'category',
         'action',
         'reason',
         'details',
-        'occurred_at'      // ADDED: This was missing!
+        'occurred_at'
     ];
 
     protected $casts = [
         'details' => 'array',
-        'occurred_at' => 'datetime',  // ADDED: This was missing!
+        'occurred_at' => 'datetime',
     ];
-
-    // Auto-generate UUID when creating
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($model) {
-            if (empty($model->id)) {
-                $model->id = Str::uuid();
-            }
-        });
-    }
 
     // Relationships
     public function device(): BelongsTo

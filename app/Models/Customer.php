@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Models\IoT\Device;
 use App\Models\IoT\DeviceMetric;
+use App\Models\IoT\DeviceProfile;
+use App\Models\IoT\FamilyDevice;
 use App\Models\IoT\SecurityEvent;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -92,11 +94,6 @@ class Customer extends Model
         return $this->devices()->byType('server');
     }
 
-    public function hybridDevices(): HasMany
-    {
-        return $this->devices()->byType('hybrid');
-    }
-
     // Business Logic Methods
     public function getActiveDevicesCount(): int
     {
@@ -106,55 +103,6 @@ class Customer extends Model
     public function canAddDevice(): bool
     {
         return $this->getActiveDevicesCount() < $this->max_devices;
-    }
-
-    public function getSubscriptionLimits(): array
-    {
-        return match($this->subscription_tier) {
-            'starter' => [
-                'max_devices' => 5,
-                'data_retention_days' => 30,
-                'api_calls_per_day' => 1000
-            ],
-            'professional' => [
-                'max_devices' => 25,
-                'data_retention_days' => 90,
-                'api_calls_per_day' => 10000
-            ],
-            'enterprise' => [
-                'max_devices' => 100,
-                'data_retention_days' => 365,
-                'api_calls_per_day' => 100000
-            ],
-            default => [
-                'max_devices' => 5,
-                'data_retention_days' => 30,
-                'api_calls_per_day' => 1000
-            ]
-        };
-    }
-
-    public function isOnTrial(): bool
-    {
-        return $this->status === 'trial' &&
-               $this->trial_ends_at &&
-               $this->trial_ends_at->isFuture();
-    }
-
-    public function isActive(): bool
-    {
-        return in_array($this->status, ['trial', 'active']);
-    }
-
-    public function getStatusColor(): string
-    {
-        return match($this->status) {
-            'active' => 'green',
-            'trial' => 'blue',
-            'suspended' => 'yellow',
-            'cancelled' => 'red',
-            default => 'gray'
-        };
     }
 
     // Scopes for common queries
@@ -172,5 +120,37 @@ class Customer extends Model
     {
         return $query->where('status', 'trial')
                     ->whereBetween('trial_ends_at', [now(), now()->addDays($days)]);
+    }
+
+    // IoT Relationships
+    public function familyDevices()
+    {
+        return $this->hasMany(FamilyDevice::class);
+    }
+
+    public function deviceProfiles()
+    {
+        return $this->hasMany(DeviceProfile::class);
+    }
+
+    public function identifiedDevices()
+    {
+        return $this->familyDevices()->where('is_identified', true);
+    }
+
+    public function onlineFamilyDevices()
+    {
+        return $this->familyDevices()->online();
+    }
+
+    // Business Logic for IoT
+    public function getOnlineFamilyDevicesCountAttribute(): int
+    {
+        return $this->onlineFamilyDevices()->count();
+    }
+
+    public function getTotalFamilyDevicesCountAttribute(): int
+    {
+        return $this->identifiedDevices()->count();
     }
 }

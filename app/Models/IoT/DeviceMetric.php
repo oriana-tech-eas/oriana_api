@@ -2,6 +2,7 @@
 
 namespace App\Models\IoT;
 
+use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -9,7 +10,7 @@ use Illuminate\Support\Str;
 
 class DeviceMetric extends Model
 {
-    use HasFactory;
+    use HasFactory, HasUuids;
 
     // Use UUID as primary key
     protected $keyType = 'string';
@@ -26,18 +27,6 @@ class DeviceMetric extends Model
         'data' => 'array',
         'collected_at' => 'datetime',
     ];
-
-    // Auto-generate UUID when creating
-    protected static function boot()
-    {
-        parent::boot();
-        
-        static::creating(function ($model) {
-            if (empty($model->id)) {
-                $model->id = Str::uuid();
-            }
-        });
-    }
 
     // Relationships
     public function device(): BelongsTo

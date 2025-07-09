@@ -14,6 +14,8 @@ use App\Http\Controllers\IoT\DeviceController;
 use App\Http\Controllers\IoT\MetricsController;
 use App\Http\Controllers\IoT\WebSocketController;
 use App\Http\Controllers\IoT\DashboardController;
+use App\Http\Controllers\IoT\DeviceProfilesController;
+use App\Http\Controllers\IoT\FamilyDevicesController;
 
 /*
 |--------------------------------------------------------------------------
@@ -118,18 +120,26 @@ Route::prefix('iot')->group(function () {
     Route::prefix('dashboard')
     ->middleware(['customer.auth']) // Apply customer resolution to all routes
     ->group(function () {
-        // Get all customer devices
         Route::get('/devices', [DashboardController::class, 'devices']);
-        // Get customer summary
         Route::get('/summary', [DashboardController::class, 'summary']);
+        Route::get('/security-events', [DashboardController::class, 'securityEvents']);
         // Device-specific routes with ownership verification
         Route::middleware(['customer.owns:device'])->group(function () {
-            // Get specific device
             Route::get('/devices/{device}', [DashboardController::class, 'device']);
-            // Get device metrics
             Route::get('/devices/{device}/metrics', [DashboardController::class, 'deviceMetrics']);
             // Execute device actions
             Route::post('/devices/{device}/actions', [DashboardController::class, 'deviceAction']);
+
+        });
+
+        Route::get('/device-profiles', [DeviceProfilesController::class, 'index']);
+
+        Route::prefix('family-devices')->group(function () {
+            Route::get('/', [FamilyDevicesController::class, 'index']);
+            Route::get('/unidentified', [FamilyDevicesController::class, 'unidentified']);
+            Route::get('/{deviceId}', [FamilyDevicesController::class, 'show']);
+            Route::put('/{deviceId}/identify', [FamilyDevicesController::class, 'identify']);
+            Route::put('/{deviceId}/profile', [FamilyDevicesController::class, 'updateProfile']);
         });
     });
 });

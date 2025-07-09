@@ -5,6 +5,7 @@ namespace App\Http\Controllers\IoT;
 use App\Http\Controllers\Controller;
 use App\Models\IoT\Device;
 use App\Models\IoT\DeviceMetric;
+use App\Models\IoT\SecurityEvent;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -237,5 +238,37 @@ class DashboardController extends Controller
         ];
 
         return response()->json($summary);
+    }
+
+    /**
+     * Get customer security events for all devices
+     */
+    public function securityEvents(Request $request)
+    {
+        $customer = $request->attributes->get('customer');
+
+        $events = SecurityEvent::whereHas('device', function($query) use ($customer) {
+            $query->where('customer_id', $customer->id);
+        })->with('device')
+          ->orderBy('created_at', 'desc')
+          ->paginate(20);
+
+        
+        Log::info('Dashboard security events request', [
+            'customer_id' => $customer->id,
+            'customer_name' => $customer->name,
+            'event_count' => $events->total()
+        ]);
+
+        return response()->json([
+            'events' => $events->items(),
+            'meta' => [
+                'total' => $events->total(),
+                'per_page' => $events->perPage(),
+                'current_page' => $events->currentPage(),
+                'last_page' => $events->lastPage(),
+                'has_more' => $events->hasMorePages()
+            ]
+        ]);
     }
 }
