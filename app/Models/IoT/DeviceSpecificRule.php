@@ -16,6 +16,8 @@ class DeviceSpecificRule extends Model
 
     protected $fillable = [
         'family_device_id',
+        'family_rule_id',
+        'override_family_rules',
         'rule_type',
         'target_value',
         'is_enabled',
@@ -25,6 +27,7 @@ class DeviceSpecificRule extends Model
 
     protected $casts = [
         'is_enabled' => 'boolean',
+        'override_family_rules' => 'boolean',
         'schedule' => 'array',
         'custom_settings' => 'array'
     ];
@@ -39,6 +42,11 @@ class DeviceSpecificRule extends Model
     public function familyDevice(): BelongsTo
     {
         return $this->belongsTo(FamilyDevice::class);
+    }
+
+    public function familyRule(): BelongsTo
+    {
+        return $this->belongsTo(FamilyRule::class);
     }
 
     // Scopes

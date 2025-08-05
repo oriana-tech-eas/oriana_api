@@ -20,6 +20,7 @@ class Device extends Model
 
     protected $fillable = [
         'customer_id',
+        'family_rule_id',
         'device_id',
         'device_type',
         'name',
@@ -52,6 +53,11 @@ class Device extends Model
     public function securityEvents(): HasMany
     {
         return $this->hasMany(SecurityEvent::class, 'device_id');
+    }
+
+    public function familyRule(): BelongsTo
+    {
+        return $this->belongsTo(FamilyRule::class);
     }
 
     // Essential Business Logic

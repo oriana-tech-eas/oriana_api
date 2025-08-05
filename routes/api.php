@@ -16,6 +16,11 @@ use App\Http\Controllers\IoT\WebSocketController;
 use App\Http\Controllers\IoT\DashboardController;
 use App\Http\Controllers\IoT\DeviceProfilesController;
 use App\Http\Controllers\IoT\FamilyDevicesController;
+use App\Http\Controllers\IoT\FilteringCategoryController;
+use App\Http\Controllers\IoT\FamilyRuleController;
+use App\Http\Controllers\IoT\FamilyBlockedDomainController;
+use App\Http\Controllers\IoT\FamilyAllowedDomainController;
+use App\Http\Controllers\IoT\DeviceRuleOverrideController;
 
 /*
 |--------------------------------------------------------------------------
@@ -140,6 +145,64 @@ Route::prefix('iot')->group(function () {
             Route::get('/{deviceId}', [FamilyDevicesController::class, 'show']);
             Route::put('/{deviceId}/identify', [FamilyDevicesController::class, 'identify']);
             Route::put('/{deviceId}/profile', [FamilyDevicesController::class, 'updateProfile']);
+        });
+
+        // Filtering Categories Routes (Read-only for customers)
+        Route::prefix('filtering-categories')->group(function () {
+            Route::get('/', [FilteringCategoryController::class, 'index']);
+            Route::get('/high-risk', [FilteringCategoryController::class, 'getHighRisk']);
+            Route::get('/severity/{severity}', [FilteringCategoryController::class, 'getBySeverity']);
+            Route::get('/{identifier}', [FilteringCategoryController::class, 'show']);
+        });
+
+        // Family Rules Routes
+        Route::prefix('family-rules')->group(function () {
+            Route::get('/', [FamilyRuleController::class, 'index']);
+            Route::post('/', [FamilyRuleController::class, 'store']);
+            Route::get('/{ruleId}', [FamilyRuleController::class, 'show']);
+            Route::put('/{ruleId}', [FamilyRuleController::class, 'update']);
+            Route::delete('/{ruleId}', [FamilyRuleController::class, 'destroy']);
+            Route::post('/{ruleId}/blocked-categories', [FamilyRuleController::class, 'addBlockedCategory']);
+            Route::delete('/{ruleId}/blocked-categories', [FamilyRuleController::class, 'removeBlockedCategory']);
+            Route::post('/{ruleId}/verify-password', [FamilyRuleController::class, 'verifyAdultPassword']);
+
+            // Blocked Domains Routes (nested under family rules)
+            Route::prefix('{ruleId}/blocked-domains')->group(function () {
+                Route::get('/', [FamilyBlockedDomainController::class, 'index']);
+                Route::post('/', [FamilyBlockedDomainController::class, 'store']);
+                Route::post('/bulk', [FamilyBlockedDomainController::class, 'bulkStore']);
+                Route::post('/check', [FamilyBlockedDomainController::class, 'checkDomain']);
+                Route::get('/{domainId}', [FamilyBlockedDomainController::class, 'show']);
+                Route::put('/{domainId}', [FamilyBlockedDomainController::class, 'update']);
+                Route::delete('/{domainId}', [FamilyBlockedDomainController::class, 'destroy']);
+            });
+
+            // Allowed Domains Routes (nested under family rules)
+            Route::prefix('{ruleId}/allowed-domains')->group(function () {
+                Route::get('/', [FamilyAllowedDomainController::class, 'index']);
+                Route::post('/', [FamilyAllowedDomainController::class, 'store']);
+                Route::post('/bulk', [FamilyAllowedDomainController::class, 'bulkStore']);
+                Route::post('/check', [FamilyAllowedDomainController::class, 'checkDomain']);
+                Route::get('/summary', [FamilyAllowedDomainController::class, 'summary']);
+                Route::get('/{domainId}', [FamilyAllowedDomainController::class, 'show']);
+                Route::put('/{domainId}', [FamilyAllowedDomainController::class, 'update']);
+                Route::delete('/{domainId}', [FamilyAllowedDomainController::class, 'destroy']);
+            });
+
+            // Rule Overrides by Rule
+            Route::get('/{ruleId}/overrides', [DeviceRuleOverrideController::class, 'getByRule']);
+        });
+
+        // Device Rule Overrides Routes (nested under family devices)
+        Route::prefix('family-devices/{deviceId}/overrides')->group(function () {
+            Route::get('/', [DeviceRuleOverrideController::class, 'index']);
+            Route::post('/', [DeviceRuleOverrideController::class, 'store']);
+            Route::get('/active', [DeviceRuleOverrideController::class, 'getActive']);
+            Route::get('/stats', [DeviceRuleOverrideController::class, 'getStats']);
+            Route::get('/{overrideId}', [DeviceRuleOverrideController::class, 'show']);
+            Route::put('/{overrideId}', [DeviceRuleOverrideController::class, 'update']);
+            Route::delete('/{overrideId}', [DeviceRuleOverrideController::class, 'destroy']);
+            Route::patch('/{overrideId}/expire', [DeviceRuleOverrideController::class, 'expire']);
         });
     });
 });

@@ -90,6 +90,16 @@ class FamilyDevice extends Model
         return $this->specificRules()->where('is_enabled', true);
     }
 
+    public function ruleOverrides(): HasMany
+    {
+        return $this->hasMany(DeviceRuleOverride::class);
+    }
+
+    public function activeOverrides(): HasMany
+    {
+        return $this->ruleOverrides()->active();
+    }
+
     // Scopes
     public function scopeForCustomer($query, $customerId)
     {
