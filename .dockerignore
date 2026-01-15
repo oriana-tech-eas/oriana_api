@@ -1,0 +1,36 @@
+# Dependencies
+/node_modules
+/vendor
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Tests
+/tests
+/phpunit.xml
+/.phpunit.cache
+
+# Build artifacts
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitignore
+/bootstrap/cache/*
+!/bootstrap/cache/.gitignore
+
+# Documentation
+README.md
+CHANGELOG.md
+docker-compose.yml
