@@ -7,7 +7,6 @@ return [
     'client_secret' => env('KEYCLOAK_CLIENT_SECRET'),
     
     // Public key for JWT verification - you can get this from Keycloak
-    // GET https://auth.oriana.orb.local/realms/oriana-services/protocol/openid_connect/certs
     'public_key' => env('KEYCLOAK_PUBLIC_KEY'),
     
     // Alternative: Use Keycloak's public key endpoint (recommended)
